@@ -5,7 +5,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
-import type { LinksFunction } from "@remix-run/node";
+import type { LinksFunction, MetaFunction } from "@remix-run/node";
 
 import "./tailwind.css";
 
@@ -22,6 +22,29 @@ export const links: LinksFunction = () => [
   },
 ];
 
+export const meta: MetaFunction = () => [
+  {
+    name: "mobile-web-app-capable",
+    content: "yes",
+  },
+  {
+    name: "apple-mobile-web-app-status-bar-style",
+    content: "black",
+  },
+  {
+    name: "apple-mobile-web-app-title",
+    content: "Multiplayer Watch",
+  },
+  {
+    name: "apple-touch-icon",
+    content: "/icons/icon-192x192.png",
+  },
+  {
+    name: "description",
+    content: "A multiplayer watch for keeping time in games.",
+  },
+]
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -30,6 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
         {children}
