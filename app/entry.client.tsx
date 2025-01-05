@@ -8,9 +8,21 @@ import { RemixBrowser } from "@remix-run/react";
 import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 
+// If we're in development, we don't use strict mode because it can run some effects twice
+// and we don't want that. We'll just use it in production.
+
 startTransition(() => {
+  if (process.env.NODE_ENV !== "production") {
+    hydrateRoot(
+      document,
+      <RemixBrowser />
+    );
+    return;
+  }
   hydrateRoot(
     document,
+    <StrictMode>
       <RemixBrowser />
+    </StrictMode>
   );
 });

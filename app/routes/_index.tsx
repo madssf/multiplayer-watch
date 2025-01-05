@@ -4,7 +4,7 @@ import { useState, FormEvent } from "react";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Set Up Your Multiplayer Clock" },
+    { title: "Set Up Your Multiplayer Watch" },
     {
       name: "description",
       content: "Configuration page for a multi-player clock."
@@ -58,7 +58,7 @@ export default function Index() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4 dark:bg-gray-900">
       <div className="w-full max-w-md rounded-md bg-white p-6 shadow-md dark:bg-gray-800">
         <h1 className="mb-4 text-center text-2xl font-bold text-gray-800 dark:text-gray-100">
-          Multiplayer Clock
+          Multiplayer Watch
         </h1>
 
         <Form onSubmit={handleSubmit}>

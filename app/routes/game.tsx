@@ -2,20 +2,26 @@ import type { MetaFunction } from "@remix-run/node";
 import { useNavigate } from "@remix-run/react";
 import { useState, useEffect, useRef } from "react";
 
-// Defines the shape of each player object
 interface Player {
   id: number;
   name: string;
-  timeLeft: number; // in seconds
+  timeLeft: number;   // in seconds
+  outOfTime?: boolean; // track if they're out of time
 }
 
-// Optional: Keep meta info if you like
 export const meta: MetaFunction = () => {
   return [
-    { title: "Game Mode - Multiplayer Clock" },
+    { title: "Game Mode - Multiplayer Watch" },
     { name: "description", content: "In-game screen for multi-player clock." },
   ];
 };
+
+interface GameState {
+  players: Player[];
+  currentPlayerIndex: number;
+  isRunning: boolean;
+  history: GameState[]; // a stack of previous states for enhanced undo
+}
 
 export default function Game() {
   const navigate = useNavigate();
@@ -25,8 +31,10 @@ export default function Game() {
   // ----------------------------
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
-  const [prevPlayerIndex, setPrevPlayerIndex] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+
+  // For enhanced undo
+  const [history, setHistory] = useState<GameState[]>([]);
 
   // Extra references to config (loaded from localStorage)
   const [numPlayers, setNumPlayers] = useState(2);
@@ -43,16 +51,15 @@ export default function Game() {
   const [editPlayers, setEditPlayers] = useState<Player[]>([]);
 
   // ----------------------------
-  // On mount: load config + any in-progress game
+  // On mount: load config + in-progress game
   // ----------------------------
   useEffect(() => {
-    // 1) Load config from localStorage
     const savedConfig = localStorage.getItem("clockConfig");
     if (!savedConfig) {
-      // No config => go back to index
       navigate("/");
       return;
     }
+
     const { numPlayers, totalTime, increment } = JSON.parse(savedConfig) as {
       numPlayers: number;
       totalTime: number;
@@ -62,25 +69,24 @@ export default function Game() {
     setTotalTime(totalTime);
     setIncrement(increment);
 
-    // 2) Check if there's a saved in-progress game state
     const savedState = localStorage.getItem("clockState");
     if (savedState) {
       const parsed = JSON.parse(savedState) as {
         players: Player[];
         currentPlayerIndex: number;
-        prevPlayerIndex: number | null;
         isRunning: boolean;
+        history: GameState[];
       };
       setPlayers(parsed.players);
       setCurrentPlayerIndex(parsed.currentPlayerIndex);
-      setPrevPlayerIndex(parsed.prevPlayerIndex);
       setIsRunning(parsed.isRunning);
+      setHistory(parsed.history || []);
     } else {
-      // Initialize fresh from config
       const initial: Player[] = Array.from({ length: numPlayers }, (_, idx) => ({
         id: idx,
         name: `Player ${idx + 1}`,
         timeLeft: totalTime,
+        outOfTime: false,
       }));
       setPlayers(initial);
       setCurrentPlayerIndex(0);
@@ -92,17 +98,16 @@ export default function Game() {
   // Persist state to localStorage
   // ----------------------------
   useEffect(() => {
-    // Only save if we have players (i.e., config was loaded)
     if (players.length > 0) {
       const gameState = {
         players,
         currentPlayerIndex,
-        prevPlayerIndex,
         isRunning,
+        history,
       };
       localStorage.setItem("clockState", JSON.stringify(gameState));
     }
-  }, [players, currentPlayerIndex, prevPlayerIndex, isRunning]);
+  }, [players, currentPlayerIndex, isRunning, history]);
 
   // ----------------------------
   // Timer effect
@@ -113,12 +118,26 @@ export default function Game() {
       if (intervalRef.current) return;
 
       intervalRef.current = setInterval(() => {
-        setPlayers((prev) => {
-          const copy = [...prev];
-          copy[currentPlayerIndex].timeLeft = Math.max(
-            copy[currentPlayerIndex].timeLeft - 1,
-            0
-          );
+        setPlayers((prevPlayers) => {
+          const copy = [...prevPlayers];
+          const active = copy[currentPlayerIndex];
+
+          if (!active.outOfTime) {
+            const newTime = active.timeLeft - 1;
+            active.timeLeft = Math.max(newTime, 0);
+
+            // If they've just hit 0, mark them out of time
+            if (active.timeLeft === 0) {
+              active.outOfTime = true;
+
+              // Move to the next player (if any), then pause
+              const nextIndex = findNextActivePlayerIndex(currentPlayerIndex, copy);
+              if (nextIndex !== null) {
+                setCurrentPlayerIndex(nextIndex);
+              }
+              setIsRunning(false);
+            }
+          }
           return copy;
         });
       }, 1000);
@@ -134,76 +153,31 @@ export default function Game() {
   }, [isRunning, currentPlayerIndex]);
 
   // ----------------------------
-  // Actions
+  // Wake Lock (keep screen on if supported)
   // ----------------------------
-  function handleStartStop() {
-    setIsRunning((prev) => !prev);
-  }
-
-  function switchToNextPlayer() {
-    if (!isRunning) return;
-    setPlayers((prev) => {
-      const copy = [...prev];
-      if (increment > 0) {
-        copy[currentPlayerIndex].timeLeft += increment;
-      }
-      return copy;
-    });
-    setPrevPlayerIndex(currentPlayerIndex);
-    setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
-  }
-
-  function handleUndo() {
-    if (prevPlayerIndex === null) return;
-    setCurrentPlayerIndex(prevPlayerIndex);
-
-    if (increment > 0) {
-      setPlayers((prev) => {
-        const copy = [...prev];
-        copy[prevPlayerIndex].timeLeft = Math.max(
-          copy[prevPlayerIndex].timeLeft - increment,
-          0
-        );
-        return copy;
-      });
-    }
-    setPrevPlayerIndex(null);
-  }
-
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
-  // ----------------------------
-  // Acquire/Release Wake Lock
-  // ----------------------------
   useEffect(() => {
-    // If wake lock is not supported, just skip.
-    if (!("wakeLock" in navigator)) {
-      return;
-    }
+    if (!("wakeLock" in navigator)) return;
 
     const acquireWakeLock = async () => {
       try {
         wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
-        console.log("Wake Lock acquired");
       } catch (err) {
         console.error("Failed to acquire wake lock:", err);
       }
     };
 
     if (isRunning) {
-      // Acquire wake lock
       acquireWakeLock();
     } else {
-      // Release wake lock if we have one
       if (wakeLockRef.current) {
         wakeLockRef.current.release().then(() => {
-          console.log("Wake Lock released");
           wakeLockRef.current = null;
         });
       }
     }
 
-    // Cleanup: release wake lock if component unmounts
     return () => {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().then(() => {
@@ -214,8 +188,69 @@ export default function Game() {
   }, [isRunning]);
 
   // ----------------------------
+  // Actions
+  // ----------------------------
+  function handleStartStop() {
+    // Only start if there's at least one active player
+    const somePlayerWithTime = players.some((p) => !p.outOfTime && p.timeLeft > 0);
+    if (!somePlayerWithTime) return;
+
+    pushHistory();
+    setIsRunning((prev) => !prev);
+  }
+
+  function handleUndo() {
+    if (history.length === 0) return;
+    const prevState = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, -1));
+
+    setPlayers(prevState.players);
+    setCurrentPlayerIndex(prevState.currentPlayerIndex);
+    setIsRunning(prevState.isRunning);
+  }
+
+  function handleAddTime(playerId: number, seconds: number) {
+    pushHistory();
+    setPlayers((prev) => {
+      const copy = [...prev];
+      const idx = copy.findIndex((p) => p.id === playerId);
+      if (idx !== -1) {
+        // Remove the outOfTime restriction so you can add time
+        copy[idx].timeLeft += seconds;
+        // If they're no longer at 0, restore them to "not out of time"
+        if (copy[idx].timeLeft > 0) {
+          copy[idx].outOfTime = false;
+        }
+      }
+      return copy;
+    });
+  }
+
+  // Saves current snapshot to the history stack
+  function pushHistory() {
+    const snapshot: GameState = {
+      players: structuredClone(players),
+      currentPlayerIndex,
+      isRunning,
+      history: [],
+    };
+    setHistory((prev) => [...prev, snapshot]);
+  }
+
+  // Find the next player who isn't out of time
+  function findNextActivePlayerIndex(currentIdx: number, list: Player[]): number | null {
+    const total = list.length;
+    for (let i = 1; i <= total; i++) {
+      const next = (currentIdx + i) % total;
+      if (!list[next].outOfTime && list[next].timeLeft > 0) {
+        return next;
+      }
+    }
+    return null;
+  }
+
+  // ----------------------------
   // Format Time
-  // If >= 3600 seconds, show HH:MM:SS; else show MM:SS
   // ----------------------------
   function formatTime(seconds: number): string {
     if (seconds >= 3600) {
@@ -234,25 +269,10 @@ export default function Game() {
   }
 
   // ----------------------------
-  // Manual Time
-  // ----------------------------
-  function handleAddTime(playerId: number, seconds: number) {
-    setPlayers((prev) => {
-      const copy = [...prev];
-      const idx = copy.findIndex((p) => p.id === playerId);
-      if (idx !== -1) {
-        copy[idx].timeLeft += seconds;
-      }
-      return copy;
-    });
-  }
-
-  // ----------------------------
-  // Modal: Edit All Names
+  // Modal: Edit All Player Names
   // ----------------------------
   function openEditNamesModal() {
-    // Make a copy of the current players so the user can safely edit
-    setEditPlayers(JSON.parse(JSON.stringify(players)));
+    setEditPlayers(structuredClone(players));
     setShowEditNamesModal(true);
   }
 
@@ -261,7 +281,7 @@ export default function Game() {
   }
 
   function saveAllNames() {
-    // Overwrite our main players with the user-edited ones
+    pushHistory();
     setPlayers(editPlayers);
     closeEditNamesModal();
   }
@@ -277,111 +297,164 @@ export default function Game() {
     });
   }
 
-  // If we haven't loaded players yet, you can optionally render null or a spinner
   if (players.length === 0) {
     return null;
   }
 
-  // Calculate total time left (for all players)
   const totalTimeLeft = players.reduce((acc, p) => acc + p.timeLeft, 0);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center bg-gray-100 p-4 dark:bg-gray-900">
       {/* TOTAL TIME HEADER */}
-      <div className="my-4 text-center text-2xl text-gray-600 dark:text-gray-300">
-        Total time left: {formatTime(totalTimeLeft)}
+      <div className="my-2 text-center">
+        <div className="text-sm uppercase tracking-wider text-gray-600 dark:text-gray-300">
+          Total time left
+        </div>
+        <div
+          className="font-mono text-3xl font-bold text-gray-700 dark:text-gray-100"
+          style={{
+            textShadow: "0 0 2px rgba(0, 0, 0, 0.2)",
+          }}
+        >
+          {formatTime(totalTimeLeft)}
+        </div>
       </div>
 
-      {/* TOP BAR (WRAPS WHEN NEEDED) */}
-      <div className="mb-4 flex w-full max-w-md flex-wrap items-center justify-between gap-2">
+      {/* TOP BAR */}
+      <div className="mb-4 flex w-full max-w-md flex-wrap items-center justify-between gap-1">
+        {/* Back */}
         <button
           onClick={() => {
-            // Clear in-progress game state to ensure a fresh start next time
+            const sure = window.confirm(
+              "Are you sure you want to exit? This will discard the current game."
+            );
+            if (!sure) return;
+
             localStorage.removeItem("clockState");
             navigate("/");
           }}
-          className="inline-flex items-center gap-1 rounded-md bg-gray-400 px-2 py-1 text-sm text-white hover:bg-gray-500"
+          className="inline-flex items-center gap-1 rounded-md bg-gray-400 px-3 py-2 text-sm text-white hover:bg-gray-500"
         >
           <span className="text-base">←</span>
           <span>Back</span>
         </button>
 
+        {/* Undo */}
         <button
           onClick={handleUndo}
-          className="inline-flex items-center gap-1 rounded-md bg-yellow-500 px-2 py-1 text-sm text-white hover:bg-yellow-600"
+          className="inline-flex items-center gap-1 rounded-md bg-yellow-500 px-3 py-2 text-sm text-white hover:bg-yellow-600"
         >
           <span className="text-base">↩</span>
           <span>Undo</span>
         </button>
 
-        <button
-          onClick={handleStartStop}
-          className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700"
-        >
-          {isRunning ? (
-            <>
-              <span className="text-base">⏸</span>
-              <span>Pause</span>
-            </>
-          ) : (
-            <>
-              <span className="text-base">▶</span>
-              <span>Start</span>
-            </>
-          )}
-        </button>
-
+        {/* Edit */}
         <button
           onClick={openEditNamesModal}
-          className="inline-flex items-center gap-1 rounded-md bg-purple-600 px-2 py-1 text-sm text-white hover:bg-purple-700"
+          className="inline-flex items-center gap-1 rounded-md bg-purple-600 px-3 py-2 text-sm text-white hover:bg-purple-700"
         >
           <span className="text-base">✏️</span>
           <span>Edit</span>
+        </button>
+
+        {/* Start / Pause */}
+        <button
+          onClick={handleStartStop}
+          className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+        >
+          <span className="text-base">{isRunning ? "⏸" : "▶️"}</span>
+          <span>{isRunning ? "Pause" : "Start"}</span>
         </button>
       </div>
 
       {/* PLAYER CLOCKS */}
       <div className="w-full max-w-md space-y-4">
-        {players.map((player, idx) => (
-          <div
-            key={player.id}
-            onClick={() => {
-              if (idx === currentPlayerIndex) {
-                switchToNextPlayer();
-              }
-            }}
-            className={`flex cursor-pointer items-center justify-between rounded-lg p-4 shadow-sm transition-all ${idx === currentPlayerIndex
-                ? "bg-blue-100 dark:bg-blue-800"
-                : "bg-white dark:bg-gray-800"
-              }`}
-          >
-            <div className="flex flex-col">
-              <span className="mb-1 w-32 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {player.name}
-              </span>
-              <span
-                className={`text-xl font-bold ${player.timeLeft <= 10
-                    ? "text-red-500"
-                    : "text-gray-800 dark:text-gray-100"
-                  }`}
-              >
-                {formatTime(player.timeLeft)}
-              </span>
-            </div>
+        {players.map((player, idx) => {
+          const isActive = idx === currentPlayerIndex && !player.outOfTime;
+          const cardClasses = [
+            "flex items-center justify-between rounded-lg p-4 shadow-sm transition-all cursor-pointer",
+          ];
 
-            {/* +10s Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent switching player on click
-                handleAddTime(player.id, 10);
+          if (player.outOfTime) {
+            cardClasses.push("bg-red-100 dark:bg-red-800 opacity-80");
+          } else if (isActive) {
+            cardClasses.push("border-4 border-blue-500 bg-blue-50 dark:bg-blue-800");
+          } else {
+            cardClasses.push("bg-white dark:bg-gray-800");
+          }
+
+          // Time styling
+          const isLowTime = player.timeLeft <= 10 && !player.outOfTime;
+          const timeColorClass = isLowTime
+            ? "text-red-500"
+            : "text-gray-800 dark:text-gray-100";
+
+          return (
+            <div
+              key={player.id}
+              onClick={() => {
+                // Tapping the active player's card also moves to next if running
+                if (isActive && isRunning) {
+                  pushHistory();
+                  const oldPlayer = players[currentPlayerIndex];
+                  // Add increment to the old player's time
+                  if (increment > 0 && !oldPlayer.outOfTime) {
+                    setPlayers((prev) => {
+                      const copy = [...prev];
+                      copy[currentPlayerIndex].timeLeft += increment;
+                      return copy;
+                    });
+                  }
+                  // Move to next
+                  const nextIndex = findNextActivePlayerIndex(currentPlayerIndex, players);
+                  if (nextIndex !== null) {
+                    setCurrentPlayerIndex(nextIndex);
+                  }
+                }
               }}
-              className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1 text-sm font-bold text-white hover:bg-green-700"
+              className={cardClasses.join(" ")}
             >
-              <span>+10s</span>
-            </button>
-          </div>
-        ))}
+              <div className="flex flex-col">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="w-32 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                    {player.name}
+                  </span>
+                  {/* Enhanced paused indicator if active but game is paused */}
+                  {isActive && !isRunning && (
+                    <span className="rounded-full bg-yellow-300 px-2 py-0.5 text-xs font-bold text-gray-800">
+                      Paused
+                    </span>
+                  )}
+                </div>
+
+                {!player.outOfTime ? (
+                  <span
+                    className={`font-mono text-xl leading-none font-bold ${timeColorClass}`}
+                  >
+                    {formatTime(player.timeLeft)}
+                  </span>
+                ) : (
+                  <span className="font-mono text-xl leading-none font-bold text-red-600 dark:text-red-300">
+                    Time’s Up!
+                  </span>
+                )}
+              </div>
+
+              {/* +10s Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddTime(player.id, 10);
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-green-600 px-4 py-2 text-base font-bold text-white hover:bg-green-700"
+                style={{ minWidth: "70px", justifyContent: "center" }}
+              >
+                +10s
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {/* MODAL: Edit All Player Names */}
