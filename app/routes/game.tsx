@@ -439,7 +439,7 @@ export default function Game() {
             >
               {/* CONTENT (name + time) */}
               <div className="flex flex-col">
-                <div className="mb-1 flex items-center">
+                <div className="mb-4 flex items-center">
                   <span className="w-32 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
                     {player.name}
                   </span>
