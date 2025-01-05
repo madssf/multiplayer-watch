@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 interface Player {
   id: number;
   name: string;
-  timeLeft: number;   // in seconds
+  timeLeft: number; // in seconds
   outOfTime?: boolean; // track if they're out of time
 }
 
@@ -357,10 +357,10 @@ export default function Game() {
           <span>Edit</span>
         </button>
 
-        {/* Start / Pause */}
+        {/* Start / Pause (fixed width to prevent layout shift) */}
         <button
           onClick={handleStartStop}
-          className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+          className="inline-flex w-[80px] items-center justify-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 transition-colors duration-200"
         >
           <span className="text-base">{isRunning ? "⏸" : "▶️"}</span>
           <span>{isRunning ? "Pause" : "Start"}</span>
@@ -371,16 +371,31 @@ export default function Game() {
       <div className="w-full max-w-md space-y-4">
         {players.map((player, idx) => {
           const isActive = idx === currentPlayerIndex && !player.outOfTime;
-          const cardClasses = [
-            "flex items-center justify-between rounded-lg p-4 shadow-sm transition-all cursor-pointer",
+
+          // Always use a 4px border so the size won't change; switch to border-blue-500 if active
+          const baseClasses = [
+            "relative", // needed so we can absolutely-position the 'Paused' label
+            "flex",
+            "items-center",
+            "justify-between",
+            "rounded-lg",
+            "border-4",
+            "p-4",
+            "shadow-sm",
+            "transition-all",
+            "duration-300",
+            "ease-in-out",
           ];
 
           if (player.outOfTime) {
-            cardClasses.push("bg-red-100 dark:bg-red-800 opacity-80");
+            // If out of time, override background color (fades to red)
+            baseClasses.push("border-transparent bg-red-100 dark:bg-red-800 opacity-80");
           } else if (isActive) {
-            cardClasses.push("border-4 border-blue-500 bg-blue-50 dark:bg-blue-800");
+            // Active player gets a border + tinted background
+            baseClasses.push("cursor-pointer border-blue-500 bg-blue-50 dark:bg-blue-800");
           } else {
-            cardClasses.push("bg-white dark:bg-gray-800");
+            // Normal, not active
+            baseClasses.push("border-transparent bg-white dark:bg-gray-800");
           }
 
           // Time styling
@@ -393,11 +408,16 @@ export default function Game() {
             <div
               key={player.id}
               onClick={() => {
-                // Tapping the active player's card also moves to next if running
-                if (isActive && isRunning) {
+                if (!isActive) return;
+        
+                if (isRunning) {
+                  // If the timer is running and you click the active player:
+                  // 1. Push history for undo
+                  // 2. Apply increment to the old player
+                  // 3. Move to the next active player (if any)
                   pushHistory();
                   const oldPlayer = players[currentPlayerIndex];
-                  // Add increment to the old player's time
+                  
                   if (increment > 0 && !oldPlayer.outOfTime) {
                     setPlayers((prev) => {
                       const copy = [...prev];
@@ -410,31 +430,27 @@ export default function Game() {
                   if (nextIndex !== null) {
                     setCurrentPlayerIndex(nextIndex);
                   }
+                } else {
+                  // If the timer is paused and you click the active player, restart the clock
+                  handleStartStop();
                 }
               }}
-              className={cardClasses.join(" ")}
+              className={baseClasses.join(" ")}
             >
+              {/* CONTENT (name + time) */}
               <div className="flex flex-col">
-                <div className="mb-1 flex items-center gap-2">
+                <div className="mb-1 flex items-center">
                   <span className="w-32 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
                     {player.name}
                   </span>
-                  {/* Enhanced paused indicator if active but game is paused */}
-                  {isActive && !isRunning && (
-                    <span className="rounded-full bg-yellow-300 px-2 py-0.5 text-xs font-bold text-gray-800">
-                      Paused
-                    </span>
-                  )}
                 </div>
 
                 {!player.outOfTime ? (
-                  <span
-                    className={`font-mono text-xl leading-none font-bold ${timeColorClass}`}
-                  >
+                  <span className={`font-mono text-xl font-bold leading-none ${timeColorClass}`}>
                     {formatTime(player.timeLeft)}
                   </span>
                 ) : (
-                  <span className="font-mono text-xl leading-none font-bold text-red-600 dark:text-red-300">
+                  <span className="font-mono text-xl font-bold leading-none text-red-600 dark:text-red-300">
                     Time’s Up!
                   </span>
                 )}
@@ -447,11 +463,21 @@ export default function Game() {
                   e.stopPropagation();
                   handleAddTime(player.id, 10);
                 }}
-                className="inline-flex items-center gap-1 rounded-md bg-green-600 px-4 py-2 text-base font-bold text-white hover:bg-green-700"
+                className="cursor-pointer inline-flex items-center gap-1 rounded-md bg-green-600 px-4 py-2 text-base font-bold text-white hover:bg-green-700"
                 style={{ minWidth: "70px", justifyContent: "center" }}
               >
                 +10s
               </button>
+
+              {/* ABSOLUTE "Paused" LABEL IN THE CENTER */}
+              <span
+                className={`absolute top-1/2 left-1/2 flex h-8 w-20 items-center justify-center 
+                            rounded bg-yellow-300 text-sm font-bold text-gray-800 shadow transition-all 
+                            duration-300 transform -translate-x-1/2 -translate-y-1/2 
+                            ${isActive && !isRunning ? "" : "invisible opacity-0"}`}
+              >
+                Paused
+              </span>
             </div>
           );
         })}
@@ -462,7 +488,7 @@ export default function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
             <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Edit All Player Names
+              Edit Player Names
             </h2>
             <div className="space-y-4">
               {editPlayers.map((p) => (
@@ -485,9 +511,8 @@ export default function Game() {
               <button
                 type="button"
                 onClick={closeEditNamesModal}
-                className="inline-flex items-center gap-1 rounded-md bg-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-400 dark:text-gray-100"
+                className="inline-flex items-center gap-1 rounded-md bg-red-400 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 dark:bg-red-600 dark:hover:bg-red-500"
               >
-                <span className="text-base">✕</span>
                 <span>Cancel</span>
               </button>
               <button
@@ -495,7 +520,6 @@ export default function Game() {
                 onClick={saveAllNames}
                 className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                <span className="text-base">💾</span>
                 <span>Save</span>
               </button>
             </div>
