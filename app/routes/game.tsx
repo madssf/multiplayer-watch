@@ -131,7 +131,10 @@ export default function Game() {
               active.outOfTime = true;
 
               // Move to the next player (if any), then pause
-              const nextIndex = findNextActivePlayerIndex(currentPlayerIndex, copy);
+              const nextIndex = findNextActivePlayerIndex(
+                currentPlayerIndex,
+                copy
+              );
               if (nextIndex !== null) {
                 setCurrentPlayerIndex(nextIndex);
               }
@@ -217,7 +220,6 @@ export default function Game() {
       if (idx !== -1) {
         // Remove the outOfTime restriction so you can add time
         copy[idx].timeLeft += seconds;
-        // If they're no longer at 0, restore them to "not out of time"
         if (copy[idx].timeLeft > 0) {
           copy[idx].outOfTime = false;
         }
@@ -238,7 +240,10 @@ export default function Game() {
   }
 
   // Find the next player who isn't out of time
-  function findNextActivePlayerIndex(currentIdx: number, list: Player[]): number | null {
+  function findNextActivePlayerIndex(
+    currentIdx: number,
+    list: Player[]
+  ): number | null {
     const total = list.length;
     for (let i = 1; i <= total; i++) {
       const next = (currentIdx + i) % total;
@@ -297,6 +302,7 @@ export default function Game() {
     });
   }
 
+  // If players haven't loaded yet, bail out
   if (players.length === 0) {
     return null;
   }
@@ -304,24 +310,37 @@ export default function Game() {
   const totalTimeLeft = players.reduce((acc, p) => acc + p.timeLeft, 0);
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center bg-gray-100 p-4 dark:bg-gray-900">
+    <div
+      className="
+        relative flex min-h-screen flex-col items-center
+        p-4
+        bg-gradient-to-r from-black via-purple-900 to-red-900
+        dark:from-gray-900 dark:via-gray-800 dark:to-gray-900
+      "
+    >
       {/* TOTAL TIME HEADER */}
-      <div className="my-2 text-center">
-        <div className="text-sm uppercase tracking-wider text-gray-600 dark:text-gray-300">
-          Total time left
+      <div className="my-3 text-center">
+        <div className="text-xs uppercase tracking-widest text-gray-300 dark:text-gray-400">
+          Total Time Left
         </div>
         <div
-          className="font-mono text-3xl font-bold text-gray-700 dark:text-gray-100"
-          style={{
-            textShadow: "0 0 2px rgba(0, 0, 0, 0.2)",
-          }}
+          className="
+            bg-gradient-to-r from-red-400 via-yellow-300 to-orange-400
+            bg-clip-text font-mono text-4xl font-extrabold text-transparent
+            drop-shadow
+          "
         >
           {formatTime(totalTimeLeft)}
         </div>
       </div>
 
       {/* TOP BAR */}
-      <div className="mb-4 flex w-full max-w-md flex-wrap items-center justify-between gap-1">
+      <div
+        className="
+          mb-4 flex w-full max-w-md flex-wrap items-center
+          justify-between gap-1
+        "
+      >
         {/* Back */}
         <button
           onClick={() => {
@@ -333,7 +352,13 @@ export default function Game() {
             localStorage.removeItem("clockState");
             navigate("/");
           }}
-          className="inline-flex items-center gap-1 rounded-md bg-gray-400 px-3 py-2 text-sm text-white hover:bg-gray-500"
+          className="
+            inline-flex items-center gap-1 rounded-md
+            bg-gradient-to-r from-gray-500 to-gray-700
+            px-2 py-2 text-sm font-bold text-white
+            shadow-md transition-transform duration-200 hover:-translate-y-0.5
+            hover:shadow-lg
+          "
         >
           <span className="text-base">←</span>
           <span>Back</span>
@@ -342,7 +367,13 @@ export default function Game() {
         {/* Undo */}
         <button
           onClick={handleUndo}
-          className="inline-flex items-center gap-1 rounded-md bg-yellow-500 px-3 py-2 text-sm text-white hover:bg-yellow-600"
+          className="
+            inline-flex items-center gap-1 rounded-md
+            bg-gradient-to-r from-yellow-400 to-yellow-500
+            px-2 py-2 text-sm font-bold text-gray-800
+            shadow-md transition-transform duration-200 hover:-translate-y-0.5
+            hover:shadow-lg
+          "
         >
           <span className="text-base">↩</span>
           <span>Undo</span>
@@ -351,16 +382,29 @@ export default function Game() {
         {/* Edit */}
         <button
           onClick={openEditNamesModal}
-          className="inline-flex items-center gap-1 rounded-md bg-purple-600 px-3 py-2 text-sm text-white hover:bg-purple-700"
+          className="
+            inline-flex items-center gap-1 rounded-md
+            bg-gradient-to-r from-purple-500 to-purple-700
+            px-2 py-2 text-sm font-bold text-white
+            shadow-md transition-transform duration-200 hover:-translate-y-0.5
+            hover:shadow-lg
+          "
         >
           <span className="text-base">✏️</span>
           <span>Edit</span>
         </button>
 
-        {/* Start / Pause (fixed width to prevent layout shift) */}
+        {/* Start / Pause */}
         <button
           onClick={handleStartStop}
-          className="inline-flex w-[80px] items-center justify-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 transition-colors duration-200"
+          className="
+            inline-flex items-center gap-1 rounded-md
+            bg-gradient-to-r from-blue-500 to-blue-700
+            px-3 py-2 text-sm font-bold text-white
+            shadow-md transition-transform duration-200 hover:-translate-y-0.5
+            hover:shadow-lg
+          "
+          style={{ minWidth: "80px", justifyContent: "center" }}
         >
           <span className="text-base">{isRunning ? "⏸" : "▶️"}</span>
           <span>{isRunning ? "Pause" : "Start"}</span>
@@ -371,10 +415,8 @@ export default function Game() {
       <div className="w-full max-w-md space-y-4">
         {players.map((player, idx) => {
           const isActive = idx === currentPlayerIndex && !player.outOfTime;
-
-          // Always use a 4px border so the size won't change; switch to border-blue-500 if active
           const baseClasses = [
-            "relative", // needed so we can absolutely-position the 'Paused' label
+            "relative",
             "flex",
             "items-center",
             "justify-between",
@@ -387,37 +429,39 @@ export default function Game() {
             "ease-in-out",
           ];
 
+          // Active/inactive/outOfTime states
           if (player.outOfTime) {
-            // If out of time, override background color (fades to red)
-            baseClasses.push("border-transparent bg-red-100 dark:bg-red-800 opacity-80");
+            baseClasses.push(
+              "border-transparent bg-red-100 dark:bg-red-800 opacity-80"
+            );
           } else if (isActive) {
-            // Active player gets a border + tinted background
-            baseClasses.push("cursor-pointer border-blue-500 bg-blue-50 dark:bg-blue-800");
+            baseClasses.push(
+              "cursor-pointer border-blue-400 bg-blue-50 dark:bg-blue-800"
+            );
           } else {
-            // Normal, not active
-            baseClasses.push("border-transparent bg-white dark:bg-gray-800");
+            baseClasses.push("border-transparent bg-gray-100 dark:bg-gray-800");
           }
 
           // Time styling
           const isLowTime = player.timeLeft <= 10 && !player.outOfTime;
           const timeColorClass = isLowTime
-            ? "text-red-500"
-            : "text-gray-800 dark:text-gray-100";
+            ? "text-red-600 dark:text-red-400"
+            : "text-gray-900 dark:text-gray-100";
 
           return (
             <div
               key={player.id}
               onClick={() => {
                 if (!isActive) return;
-        
+
                 if (isRunning) {
                   // If the timer is running and you click the active player:
                   // 1. Push history for undo
-                  // 2. Apply increment to the old player
-                  // 3. Move to the next active player (if any)
+                  // 2. Apply increment
+                  // 3. Move to the next
                   pushHistory();
                   const oldPlayer = players[currentPlayerIndex];
-                  
+
                   if (increment > 0 && !oldPlayer.outOfTime) {
                     setPlayers((prev) => {
                       const copy = [...prev];
@@ -425,13 +469,15 @@ export default function Game() {
                       return copy;
                     });
                   }
-                  // Move to next
-                  const nextIndex = findNextActivePlayerIndex(currentPlayerIndex, players);
+                  const nextIndex = findNextActivePlayerIndex(
+                    currentPlayerIndex,
+                    players
+                  );
                   if (nextIndex !== null) {
                     setCurrentPlayerIndex(nextIndex);
                   }
                 } else {
-                  // If the timer is paused and you click the active player, restart the clock
+                  // If paused, clicking the active player resumes
                   handleStartStop();
                 }
               }}
@@ -440,17 +486,19 @@ export default function Game() {
               {/* CONTENT (name + time) */}
               <div className="flex flex-col">
                 <div className="mb-4 flex items-center">
-                  <span className="w-32 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  <span className="max-w-[8rem] truncate text-base font-bold text-gray-800 dark:text-gray-100">
                     {player.name}
                   </span>
                 </div>
 
                 {!player.outOfTime ? (
-                  <span className={`font-mono text-xl font-bold leading-none ${timeColorClass}`}>
+                  <span
+                    className={`font-mono text-2xl font-extrabold leading-none ${timeColorClass}`}
+                  >
                     {formatTime(player.timeLeft)}
                   </span>
                 ) : (
-                  <span className="font-mono text-xl font-bold leading-none text-red-600 dark:text-red-300">
+                  <span className="font-mono text-2xl font-extrabold leading-none text-red-600 dark:text-red-300">
                     Time’s Up!
                   </span>
                 )}
@@ -463,18 +511,26 @@ export default function Game() {
                   e.stopPropagation();
                   handleAddTime(player.id, 10);
                 }}
-                className="cursor-pointer inline-flex items-center gap-1 rounded-md bg-green-600 px-4 py-2 text-base font-bold text-white hover:bg-green-700"
-                style={{ minWidth: "70px", justifyContent: "center" }}
+                className="
+                  inline-flex items-center justify-center gap-1
+                  rounded-md bg-gradient-to-r from-green-500 to-green-700
+                  px-4 py-2 text-base font-bold text-white
+                  shadow-md transition-transform hover:-translate-y-0.5
+                  hover:shadow-lg
+                "
+                style={{ minWidth: "70px" }}
               >
                 +10s
               </button>
 
-              {/* ABSOLUTE "Paused" LABEL IN THE CENTER */}
+              {/* ABSOLUTE "Paused" LABEL */}
               <span
-                className={`absolute top-1/2 left-1/2 flex h-8 w-20 items-center justify-center 
-                            rounded bg-yellow-300 text-sm font-bold text-gray-800 shadow transition-all 
-                            duration-300 transform -translate-x-1/2 -translate-y-1/2 
-                            ${isActive && !isRunning ? "" : "invisible opacity-0"}`}
+                className={`
+                  absolute top-1/2 left-1/2 flex h-8 w-20 -translate-x-1/2 -translate-y-1/2
+                  items-center justify-center rounded bg-yellow-300 text-sm font-bold text-gray-800
+                  shadow transition-all duration-300
+                  ${isActive && !isRunning ? "" : "invisible opacity-0"}
+                `}
               >
                 Paused
               </span>
@@ -486,8 +542,13 @@ export default function Game() {
       {/* MODAL: Edit All Player Names */}
       {showEditNamesModal && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div
+            className="
+              w-full max-w-md rounded-lg bg-gray-50 p-6 shadow-2xl
+              dark:bg-gray-800
+            "
+          >
+            <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-gray-100">
               Edit Player Names
             </h2>
             <div className="space-y-4">
@@ -498,7 +559,11 @@ export default function Game() {
                   </label>
                   <input
                     type="text"
-                    className="rounded-md border border-gray-300 px-3 py-2 text-gray-800 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    className="
+                      rounded-md border border-gray-300 px-3 py-2 text-gray-800
+                      focus:outline-none dark:border-gray-600 dark:bg-gray-700
+                      dark:text-gray-100
+                    "
                     value={p.name}
                     onChange={(e) => handleModalNameChange(p.id, e.target.value)}
                   />
@@ -511,16 +576,24 @@ export default function Game() {
               <button
                 type="button"
                 onClick={closeEditNamesModal}
-                className="inline-flex items-center gap-1 rounded-md bg-red-400 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 dark:bg-red-600 dark:hover:bg-red-500"
+                className="
+                  inline-flex items-center gap-1 rounded-md
+                  bg-red-400 px-3 py-2 text-sm font-semibold text-white
+                  transition-colors hover:bg-red-500 dark:bg-red-600 dark:hover:bg-red-500
+                "
               >
-                <span>Cancel</span>
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={saveAllNames}
-                className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="
+                  inline-flex items-center gap-1 rounded-md
+                  bg-blue-600 px-3 py-2 text-sm font-semibold text-white
+                  transition-colors hover:bg-blue-700
+                "
               >
-                <span>Save</span>
+                Save
               </button>
             </div>
           </div>
