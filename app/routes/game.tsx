@@ -370,8 +370,7 @@ export default function Game() {
           className="
             inline-flex items-center gap-1 rounded-md
             bg-gradient-to-r from-yellow-400 to-yellow-500
-            px-2 py-2 text-sm font-bold text-gray-800
-            shadow-md transition-transform duration-200 hover:-translate-y-0.5
+            px-2 py-2 text-sm font-bold text-white shadow-md
             hover:shadow-lg
           "
         >
@@ -385,8 +384,7 @@ export default function Game() {
           className="
             inline-flex items-center gap-1 rounded-md
             bg-gradient-to-r from-purple-500 to-purple-700
-            px-2 py-2 text-sm font-bold text-white
-            shadow-md transition-transform duration-200 hover:-translate-y-0.5
+            px-2 py-2 text-sm font-bold text-white shadow-md
             hover:shadow-lg
           "
         >
@@ -398,13 +396,12 @@ export default function Game() {
         <button
           onClick={handleStartStop}
           className="
-            inline-flex items-center gap-1 rounded-md
+            inline-flex items-center gap-2 rounded-md
             bg-gradient-to-r from-blue-500 to-blue-700
-            px-3 py-2 text-sm font-bold text-white
-            shadow-md transition-transform duration-200 hover:-translate-y-0.5
+            px-2 py-2 text-sm font-bold text-white shadow-md
             hover:shadow-lg
+            w-24 justify-left
           "
-          style={{ minWidth: "80px", justifyContent: "center" }}
         >
           <span className="text-base">{isRunning ? "⏸" : "▶️"}</span>
           <span>{isRunning ? "Pause" : "Start"}</span>
@@ -427,6 +424,7 @@ export default function Game() {
             "transition-all",
             "duration-300",
             "ease-in-out",
+            "transform", // Enable transform for scaling
           ];
 
           // Active/inactive/outOfTime states
@@ -436,7 +434,10 @@ export default function Game() {
             );
           } else if (isActive) {
             baseClasses.push(
-              "cursor-pointer border-blue-400 bg-blue-50 dark:bg-blue-800"
+              "cursor-pointer border-blue-400 bg-blue-50 dark:bg-blue-800",
+              "shadow-lg", // Enhanced shadow
+              "scale-105", // Slightly enlarge the card
+              "animate-pulse-slow" // Custom pulse animation
             );
           } else {
             baseClasses.push("border-transparent bg-gray-100 dark:bg-gray-800");
