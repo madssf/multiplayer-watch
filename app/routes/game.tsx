@@ -335,6 +335,12 @@ export default function Game() {
 
     pushHistory(); // allow 'undo' for reorder
     setPlayers((prev) => reorder(prev, source.index, destination.index));
+    setCurrentPlayerIndex((prev) => {
+      if (prev === source.index) return destination.index;
+      if (prev > source.index && prev <= destination.index) return prev - 1;
+      if (prev < source.index && prev >= destination.index) return prev + 1;
+      return prev;
+    });
   }
 
   // If players haven't loaded yet, bail out
@@ -507,7 +513,7 @@ export default function Game() {
         <Droppable droppableId="playersDroppable">
           {(provided) => (
             <div
-              className="w-full max-w-md space-y-4"
+              className="w-full max-w-md"
               ref={provided.innerRef}
               {...provided.droppableProps}
             >
@@ -526,11 +532,8 @@ export default function Game() {
                   "rounded-lg",
                   "border-4",
                   "p-4",
+                  "my-2",
                   "shadow-sm",
-                  "transition-all",
-                  "duration-300",
-                  "ease-in-out",
-                  "transform",
                 ];
 
                 // Player states
@@ -542,7 +545,6 @@ export default function Game() {
                   baseClasses.push(
                     "cursor-pointer border-blue-400 bg-blue-50 dark:bg-blue-800",
                     "shadow-lg",
-                    "scale-105",
                     "animate-pulse-slow"
                   );
                 } else {
@@ -550,7 +552,7 @@ export default function Game() {
                 }
 
                 const isLowTime =
-                  player.timeLeft <= 10 && !player.outOfTime && !player.dead;
+                  player.timeLeft <= (totalTime / 5) && !player.outOfTime && !player.dead;
                 const timeColorClass = isLowTime
                   ? "text-red-600 dark:text-red-400"
                   : "text-gray-900 dark:text-gray-100";

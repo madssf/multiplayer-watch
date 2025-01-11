@@ -62,11 +62,7 @@ export default function Index() {
   const isSubmitting = false; // For a loading state if needed
 
   // Quick preview: show final time as mm:ss
-  const timePreview =
-    timeMode === "perPlayer"
-      ? `Each Player: ${formatTime(finalTimePerPlayer)}`
-      : `Total: ${formatTime(minutesInput * 60)}
-         | Per Player: ${formatTime(finalTimePerPlayer)}`;
+  const timePreview = `Total: ${formatTime(minutesInput * 60)} | Per Player: ${formatTime(finalTimePerPlayer)}`;
 
   return (
     <div
