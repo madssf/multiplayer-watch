@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
+    "@hello-pangea/dnd": "^17.0.0",
     "@heroicons/react": "^2.2.0",
     "@remix-run/node": "^2.15.2",
     "@remix-run/react": "^2.15.2",
