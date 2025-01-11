@@ -6,7 +6,8 @@ interface Player {
   id: number;
   name: string;
   timeLeft: number; // in seconds
-  outOfTime?: boolean; // track if they're out of time
+  outOfTime?: boolean;
+  dead?: boolean; // NEW: Indicates if the player is out of the game
 }
 
 export const meta: MetaFunction = () => {
@@ -87,6 +88,7 @@ export default function Game() {
         name: `Player ${idx + 1}`,
         timeLeft: totalTime,
         outOfTime: false,
+        dead: false, // NEW: Initialize players as alive
       }));
       setPlayers(initial);
       setCurrentPlayerIndex(0);
@@ -122,7 +124,7 @@ export default function Game() {
           const copy = [...prevPlayers];
           const active = copy[currentPlayerIndex];
 
-          if (!active.outOfTime) {
+          if (!active.outOfTime && !active.dead) { // skip if dead
             const newTime = active.timeLeft - 1;
             active.timeLeft = Math.max(newTime, 0);
 
@@ -194,8 +196,10 @@ export default function Game() {
   // Actions
   // ----------------------------
   function handleStartStop() {
-    // Only start if there's at least one active player
-    const somePlayerWithTime = players.some((p) => !p.outOfTime && p.timeLeft > 0);
+    // Only start if there's at least one active (alive + has time) player
+    const somePlayerWithTime = players.some(
+      (p) => !p.outOfTime && !p.dead && p.timeLeft > 0
+    );
     if (!somePlayerWithTime) return;
 
     pushHistory();
@@ -239,7 +243,7 @@ export default function Game() {
     setHistory((prev) => [...prev, snapshot]);
   }
 
-  // Find the next player who isn't out of time
+  // Find the next player who isn't outOfTime or dead
   function findNextActivePlayerIndex(
     currentIdx: number,
     list: Player[]
@@ -247,7 +251,7 @@ export default function Game() {
     const total = list.length;
     for (let i = 1; i <= total; i++) {
       const next = (currentIdx + i) % total;
-      if (!list[next].outOfTime && list[next].timeLeft > 0) {
+      if (!list[next].outOfTime && !list[next].dead && list[next].timeLeft > 0) {
         return next;
       }
     }
@@ -307,7 +311,10 @@ export default function Game() {
     return null;
   }
 
-  const totalTimeLeft = players.reduce((acc, p) => acc + p.timeLeft, 0);
+  // NEW: Filter out dead players when calculating total time left
+  const totalTimeLeft = players
+    .filter((p) => !p.dead)
+    .reduce((acc, p) => acc + p.timeLeft, 0);
 
   return (
     <div
@@ -356,8 +363,7 @@ export default function Game() {
             inline-flex items-center gap-1 rounded-md
             bg-gradient-to-r from-gray-500 to-gray-700
             px-2 py-2 text-sm font-bold text-white
-            shadow-md transition-transform duration-200 hover:-translate-y-0.5
-            hover:shadow-lg
+            shadow-md hover:shadow-lg
           "
         >
           <span className="text-base">←</span>
@@ -406,12 +412,44 @@ export default function Game() {
           <span className="text-base">{isRunning ? "⏸" : "▶️"}</span>
           <span>{isRunning ? "Pause" : "Start"}</span>
         </button>
+        {/* NEW GAME BUTTON */}
+        {/* NEW: Reset the game with the same players */}
+        <button
+          onClick={() => {
+            const sure = window.confirm(
+              "Start a new game with the same players?"
+            );
+            if (!sure) return;
+
+            // Reset players' time and states
+            setPlayers((prevPlayers) =>
+              prevPlayers.map((p) => ({
+                ...p,
+                timeLeft: p.dead ? 0 : totalTime, // If dead, keep time at 0
+                outOfTime: p.dead ? true : false,
+              }))
+            );
+            setCurrentPlayerIndex(0);
+            setIsRunning(false);
+            setHistory([]);
+          }}
+          className="
+            inline-flex items-center gap-1 rounded-md
+            bg-gradient-to-r from-green-500 to-green-700
+            px-2 py-2 text-sm font-bold text-white shadow-md
+            hover:shadow-lg
+          "
+        >
+          <span>♻️</span>
+          <span>New Game</span>
+        </button>
       </div>
 
       {/* PLAYER CLOCKS */}
       <div className="w-full max-w-md space-y-4">
         {players.map((player, idx) => {
-          const isActive = idx === currentPlayerIndex && !player.outOfTime;
+          // Is this player currently active (and not dead/outOfTime)?
+          const isActive = idx === currentPlayerIndex && !player.outOfTime && !player.dead;
           const baseClasses = [
             "relative",
             "flex",
@@ -427,10 +465,14 @@ export default function Game() {
             "transform", // Enable transform for scaling
           ];
 
-          // Active/inactive/outOfTime states
-          if (player.outOfTime) {
+          // Player states
+          if (player.dead) {
             baseClasses.push(
-              "border-transparent bg-red-100 dark:bg-red-800 opacity-80"
+              "border-transparent bg-gray-500 opacity-60" // Style for dead players
+            );
+          } else if (player.outOfTime) {
+            baseClasses.push(
+              "border-transparent bg-red-100 dark:bg-red-800 opacity-80" // Style for out of time
             );
           } else if (isActive) {
             baseClasses.push(
@@ -440,11 +482,13 @@ export default function Game() {
               "animate-pulse-slow" // Custom pulse animation
             );
           } else {
-            baseClasses.push("border-transparent bg-gray-100 dark:bg-gray-800");
+            baseClasses.push(
+              "border-transparent bg-gray-100 dark:bg-gray-800" // Default style
+            );
           }
 
           // Time styling
-          const isLowTime = player.timeLeft <= 10 && !player.outOfTime;
+          const isLowTime = player.timeLeft <= 10 && !player.outOfTime && !player.dead;
           const timeColorClass = isLowTime
             ? "text-red-600 dark:text-red-400"
             : "text-gray-900 dark:text-gray-100";
@@ -453,6 +497,8 @@ export default function Game() {
             <div
               key={player.id}
               onClick={() => {
+                // If dead or outOfTime, ignore.
+                if (player.dead || player.outOfTime) return;
                 if (!isActive) return;
 
                 if (isRunning) {
@@ -462,8 +508,7 @@ export default function Game() {
                   // 3. Move to the next
                   pushHistory();
                   const oldPlayer = players[currentPlayerIndex];
-
-                  if (increment > 0 && !oldPlayer.outOfTime) {
+                  if (increment > 0 && !oldPlayer.outOfTime && !oldPlayer.dead) {
                     setPlayers((prev) => {
                       const copy = [...prev];
                       copy[currentPlayerIndex].timeLeft += increment;
@@ -492,11 +537,15 @@ export default function Game() {
                   </span>
                 </div>
 
-                {!player.outOfTime ? (
+                {!player.outOfTime && !player.dead ? (
                   <span
                     className={`font-mono text-2xl font-extrabold leading-none ${timeColorClass}`}
                   >
                     {formatTime(player.timeLeft)}
+                  </span>
+                ) : player.dead ? (
+                  <span className="font-mono text-2xl font-extrabold leading-none text-gray-900 dark:text-gray-200">
+                    Dead
                   </span>
                 ) : (
                   <span className="font-mono text-2xl font-extrabold leading-none text-red-600 dark:text-red-300">
@@ -504,26 +553,82 @@ export default function Game() {
                   </span>
                 )}
               </div>
+              <div className="flex flex-row items-center justify-between space-x-2">
+                {/* +10s Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddTime(player.id, 10);
+                  }}
+                  className="
+      inline-flex items-center justify-center gap-1
+      rounded-md bg-gradient-to-r from-green-500 to-green-700
+      px-2 py-1 text-sm font-semibold text-white
+      shadow-md hover:shadow-lg
+    "
+                >
+                  +10s
+                </button>
 
-              {/* +10s Button */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddTime(player.id, 10);
-                }}
-                className="
-                  inline-flex items-center justify-center gap-1
-                  rounded-md bg-gradient-to-r from-green-500 to-green-700
-                  px-4 py-2 text-base font-bold text-white
-                  shadow-md transition-transform hover:-translate-y-0.5
-                  hover:shadow-lg
-                "
-                style={{ minWidth: "70px" }}
-              >
-                +10s
-              </button>
+                {/* -10s Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddTime(player.id, -10);
+                  }}
+                  className="
+      inline-flex items-center justify-center gap-1
+      rounded-md bg-gradient-to-r from-red-500 to-red-700
+      px-2 py-1 text-sm font-semibold text-white
+      shadow-md hover:shadow-lg
+    "
+                >
+                  -10s
+                </button>
 
+                {/* Kill / Revive Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    pushHistory();
+
+                    // Toggle the 'dead' status of the player
+                    const updatedPlayers = players.map((p) =>
+                      p.id === player.id ? { ...p, dead: !p.dead } : p
+                    );
+                    setPlayers(updatedPlayers);
+
+                    if (!player.dead && isRunning) {
+                      // If the player was just killed, pause the game
+                      setIsRunning(false);
+                      const nextIndex = findNextActivePlayerIndex(
+                        currentPlayerIndex,
+                        updatedPlayers
+                      );
+                      if (nextIndex !== null) {
+                        setCurrentPlayerIndex(nextIndex);
+                      } else {
+                        alert("No active players left!");
+                      }
+                    } else if (player.dead) {
+                      // If the player was revived, set them as the current player and pause the game
+                      setCurrentPlayerIndex(player.id);
+                      setIsRunning(false);
+                    }
+                  }}
+                  className="
+      inline-flex items-center justify-center gap-1
+      rounded-md bg-gradient-to-r from-gray-500 to-gray-700
+      px-2 py-1 text-sm font-semibold text-white
+      shadow-md hover:shadow-lg
+    "
+                >
+                  {player.dead ? "Revive" : "Kill"}
+                </button>
+              </div>
               {/* ABSOLUTE "Paused" LABEL */}
               <span
                 className={`
