@@ -479,8 +479,9 @@ export default function Game() {
                         setPlayers((prevPlayers) =>
                           prevPlayers.map((p) => ({
                             ...p,
-                            timeLeft: p.dead ? 0 : totalTime,
-                            outOfTime: p.dead ? true : false,
+                            timeLeft: totalTime,
+                            outOfTime: false,
+                            dead: false,
                           }))
                         );
                         setCurrentPlayerIndex(0);
@@ -514,6 +515,8 @@ export default function Game() {
                 // Is this player currently active (and not dead/outOfTime)?
                 const isActive =
                   idx === currentPlayerIndex && !player.outOfTime && !player.dead;
+
+                const isCurrent = idx === currentPlayerIndex;
 
                 const baseClasses = [
                   "relative",
@@ -609,6 +612,13 @@ export default function Game() {
                             <span className="max-w-[8rem] truncate text-base font-bold text-gray-800 dark:text-gray-100">
                               {player.name}
                             </span>
+                            {
+                              isCurrent && !isRunning && (
+                                <span className="ml-2 text-sm font-semibold text-blue-500 dark:text-blue-300">
+                                  ⏸️
+                                </span>
+                              )
+                            }
                           </div>
 
                           {!player.outOfTime && !player.dead ? (
@@ -629,18 +639,6 @@ export default function Game() {
                         </div>
 
                         <div className="flex flex-row items-center justify-between space-x-2">
-                          {/* ABSOLUTE "Paused" LABEL */}
-                          <span
-                            className={`
-                              flex h-8 w-12
-                              items-center justify-center rounded bg-yellow-300 text-sm font-bold text-gray-800
-                              shadow transition-all duration-300
-                              ${isActive && !isRunning ? "" : "invisible opacity-0"}
-                            `}
-                          >
-                            ⏸️
-                          </span>
-
                           {/* +10s Button */}
                           <button
                             type="button"
@@ -688,7 +686,7 @@ export default function Game() {
                               );
                               setPlayers(updatedPlayers);
 
-                              if (!player.dead && isRunning) {
+                              if (!player.dead) {
                                 // If the player was just killed, pause the game
                                 setIsRunning(false);
                                 const nextIndex = findNextActivePlayerIndex(
