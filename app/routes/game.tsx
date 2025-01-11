@@ -1,6 +1,8 @@
 import type { MetaFunction } from "@remix-run/node";
 import { useNavigate } from "@remix-run/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
+import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
+import { ChevronDownIcon } from '@heroicons/react/24/solid'; // Optional: For dropdown indicator
 
 interface Player {
   id: number;
@@ -344,8 +346,8 @@ export default function Game() {
       {/* TOP BAR */}
       <div
         className="
-          mb-4 flex w-full max-w-md flex-wrap items-center
-          justify-between gap-1
+          mb-4 flex w-full max-w-lg flex-wrap items-center
+          justify-between gap-2
         "
       >
         {/* Back */}
@@ -376,26 +378,12 @@ export default function Game() {
           className="
             inline-flex items-center gap-1 rounded-md
             bg-gradient-to-r from-yellow-400 to-yellow-500
+            w-16 justify-center
             px-2 py-2 text-sm font-bold text-white shadow-md
             hover:shadow-lg
           "
         >
           <span className="text-base">↩</span>
-          <span>Undo</span>
-        </button>
-
-        {/* Edit */}
-        <button
-          onClick={openEditNamesModal}
-          className="
-            inline-flex items-center gap-1 rounded-md
-            bg-gradient-to-r from-purple-500 to-purple-700
-            px-2 py-2 text-sm font-bold text-white shadow-md
-            hover:shadow-lg
-          "
-        >
-          <span className="text-base">✏️</span>
-          <span>Edit</span>
         </button>
 
         {/* Start / Pause */}
@@ -406,43 +394,86 @@ export default function Game() {
             bg-gradient-to-r from-blue-500 to-blue-700
             px-2 py-2 text-sm font-bold text-white shadow-md
             hover:shadow-lg
-            w-24 justify-left
+            w-16 justify-center
           "
         >
           <span className="text-base">{isRunning ? "⏸" : "▶️"}</span>
-          <span>{isRunning ? "Pause" : "Start"}</span>
         </button>
-        {/* NEW GAME BUTTON */}
-        {/* NEW: Reset the game with the same players */}
-        <button
-          onClick={() => {
-            const sure = window.confirm(
-              "Start a new game with the same players?"
-            );
-            if (!sure) return;
 
-            // Reset players' time and states
-            setPlayers((prevPlayers) =>
-              prevPlayers.map((p) => ({
-                ...p,
-                timeLeft: p.dead ? 0 : totalTime, // If dead, keep time at 0
-                outOfTime: p.dead ? true : false,
-              }))
-            );
-            setCurrentPlayerIndex(0);
-            setIsRunning(false);
-            setHistory([]);
-          }}
-          className="
-            inline-flex items-center gap-1 rounded-md
-            bg-gradient-to-r from-green-500 to-green-700
-            px-2 py-2 text-sm font-bold text-white shadow-md
-            hover:shadow-lg
-          "
-        >
-          <span>♻️</span>
-          <span>New Game</span>
-        </button>
+        {/* Dropdown Menu for Additional Actions */}
+        <Menu as="div" className="relative inline-block text-left">
+          <MenuButton
+            className="
+              inline-flex items-center justify-center gap-1 rounded-md
+              bg-gradient-to-r from-purple-500 to-purple-700
+              px-2 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg
+            "
+          >
+            Options
+            <ChevronDownIcon className="w-4 h-4" />
+          </MenuButton>
+
+          {/* Use Transition for smooth dropdown animations */}
+          <Transition
+            as={Fragment}
+            enter="transition ease-out duration-100"
+            enterFrom="transform opacity-0 scale-95"
+            enterTo="transform opacity-100 scale-100"
+            leave="transition ease-in duration-75"
+            leaveFrom="transform opacity-100 scale-100"
+            leaveTo="transform opacity-0 scale-95"
+          >
+            <MenuItems
+              className="
+                absolute right-0 mt-2 w-40 origin-top-right
+                rounded-md bg-white dark:bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5
+                focus:outline-none z-50
+              "
+            >
+              <div className="py-1">
+                <MenuItem>
+                  {({ active }) => (
+                    <button
+                      onClick={openEditNamesModal}
+                      className={`${active ? 'bg-gray-100 dark:bg-gray-600' : ''
+                        } group flex w-full items-center rounded-md px-4 py-2 text-sm text-gray-700 dark:text-gray-200`}
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
+                </MenuItem>
+                <MenuItem>
+                  {({ active }) => (
+                    <button
+                      onClick={() => {
+                        const sure = window.confirm(
+                          "Start a new game with the same players?"
+                        );
+                        if (!sure) return;
+
+                        // Reset players' time and states
+                        setPlayers((prevPlayers) =>
+                          prevPlayers.map((p) => ({
+                            ...p,
+                            timeLeft: p.dead ? 0 : totalTime, // If dead, keep time at 0
+                            outOfTime: p.dead ? true : false,
+                          }))
+                        );
+                        setCurrentPlayerIndex(0);
+                        setIsRunning(false);
+                        setHistory([]);
+                      }}
+                      className={`${active ? 'bg-gray-100 dark:bg-gray-600' : ''
+                        } group flex w-full items-center rounded-md px-4 py-2 text-sm text-gray-700 dark:text-gray-200`}
+                    >
+                      ♻️ New Game
+                    </button>
+                  )}
+                </MenuItem>
+              </div>
+            </MenuItems>
+          </Transition>
+        </Menu>
       </div>
 
       {/* PLAYER CLOCKS */}
@@ -554,6 +585,18 @@ export default function Game() {
                 )}
               </div>
               <div className="flex flex-row items-center justify-between space-x-2">
+                              {/* ABSOLUTE "Paused" LABEL */}
+              <span
+                className={`
+                  flex h-8 w-12
+                  items-center justify-center rounded bg-yellow-300 text-sm font-bold text-gray-800
+                  shadow transition-all duration-300
+                  ${isActive && !isRunning ? "" : "invisible opacity-0"}
+                `}
+              >
+                ⏸️
+              </span>
+
                 {/* +10s Button */}
                 <button
                   type="button"
@@ -629,17 +672,6 @@ export default function Game() {
                   {player.dead ? "Revive" : "Kill"}
                 </button>
               </div>
-              {/* ABSOLUTE "Paused" LABEL */}
-              <span
-                className={`
-                  absolute top-1/2 left-1/2 flex h-8 w-20 -translate-x-1/2 -translate-y-1/2
-                  items-center justify-center rounded bg-yellow-300 text-sm font-bold text-gray-800
-                  shadow transition-all duration-300
-                  ${isActive && !isRunning ? "" : "invisible opacity-0"}
-                `}
-              >
-                Paused
-              </span>
             </div>
           );
         })}
